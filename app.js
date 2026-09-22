@@ -17,7 +17,7 @@ const el = {
   toast: $('#toast')
 };
 
-const USTAWIENIA_KLUCZ = 'zielnik.ustawienia';
+const USTAWIENIA_KLUCZ = 'viridarium.ustawienia';
 let ustawienia = { provider: 'gemini', apiKey: '', model: '' };
 let strumien = null;
 let kamera = 'environment';
@@ -52,7 +52,7 @@ let baza = null;
 function otworzBaze(){
   if(baza) return baza;
   baza = new Promise((ok, err) => {
-    const req = indexedDB.open('zielnik', 1);
+    const req = indexedDB.open('viridarium', 1);
     req.onupgradeneeded = () => {
       req.result.createObjectStore('okazy', { keyPath: 'id', autoIncrement: true });
     };

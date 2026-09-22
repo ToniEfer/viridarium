@@ -1,6 +1,6 @@
 {
-  "name": "Zielnik — rozpoznawanie roślin",
-  "short_name": "Zielnik",
+  "name": "Viridarium — rozpoznawanie roślin",
+  "short_name": "Viridarium",
   "description": "Skieruj aparat na roślinę: oznaczenie gatunku, siedlisko, uprawa i ocena kondycji na arkuszu zielnikowym.",
   "start_url": "./index.html",
   "scope": "./",

@@ -1,4 +1,4 @@
-# Zielnik — rozpoznawanie roślin
+# Viridarium — rozpoznawanie roślin
 
 PWA: kamera → przycisk „Analizuj" → arkusz zielnikowy z oznaczeniem gatunku,
 opisem siedliska, zasadami uprawy i oceną kondycji. Każde rozpoznanie dopisuje
@@ -22,7 +22,7 @@ samym oknie. Nazwy modeli się zmieniają.
 ## 2. Uruchomienie na komputerze
 
 ```bash
-cd PlantApp
+cd Viridarium
 python3 -m http.server 8000
 ```
 
@@ -38,7 +38,7 @@ Przeglądarka udostępnia kamerę tylko przez HTTPS. Adres typu `192.168.0.12:80
 nie wystarczy. Trzy drogi, od najszybszej:
 
 **a) Netlify Drop** — wejdź na app.netlify.com/drop i przeciągnij folder
-`PlantApp`. Dostajesz adres HTTPS w kilkanaście sekund, bez konta.
+`Viridarium`. Dostajesz adres HTTPS w kilkanaście sekund, bez konta.
 
 **b) Tunel do komputera** — przy działającym `python3 -m http.server 8000`:
 
@@ -46,7 +46,13 @@ nie wystarczy. Trzy drogi, od najszybszej:
 npx localtunnel --port 8000        # albo: cloudflared tunnel --url http://localhost:8000
 ```
 
-**c) Dowolny hosting statyczny** — GitHub Pages, Vercel, własny serwer.
+**c) GitHub Pages** — repozytorium publiczne, Settings → Pages → *Deploy from a
+branch*, gałąź `main`, katalog `/ (root)`. Adres wychodzi w postaci
+`nazwa-uzytkownika.github.io/nazwa-repozytorium/`. Pole *Custom domain* zostaw
+puste — służy do wpinania własnej domeny, którą się kupuje, nie do nazwania
+aplikacji.
+
+**d) Dowolny inny hosting statyczny** — Vercel, Netlify, własny serwer.
 
 Zdjęcie z galerii (ikona obrazka obok spustu) działa zawsze, także bez HTTPS —
 to droga awaryjna, gdy kamera jest niedostępna.
@@ -66,7 +72,18 @@ mała funkcja pośrednicząca (Cloudflare Worker, Vercel Function), która trzym
 klucz po stronie serwera i przekazuje zdjęcie dalej. W `recognize.js` wystarczy
 wtedy podmienić adres i usunąć nagłówki z kluczem.
 
-## 6. Pliki
+## 6. Aktualizacja po zmianach
+
+Service worker trzyma pliki w pamięci podręcznej, żeby aplikacja działała bez
+sieci. Po każdej podmianie plików zmień w `sw.js` pierwszą linię:
+
+```js
+const CACHE = 'viridarium-v1';   // → 'viridarium-v2', 'v3', ...
+```
+
+Bez tego telefon może pokazywać starą wersję mimo wgrania nowej.
+
+## 7. Pliki
 
 ```
 index.html           struktura ekranów
@@ -82,7 +99,7 @@ Treść promptu — czyli to, o co pytamy model i w jakiej strukturze ma odpowie
 — siedzi w `recognize.js` w stałej `PROMPT`. Tam dodajesz nowe sekcje arkusza;
 pamiętaj, żeby dodać im też miejsce w `arkuszHTML()` w `app.js`.
 
-## 7. Granice
+## 8. Granice
 
 Oznaczenie z jednego zdjęcia bywa błędne, szczególnie przy gatunkach, które
 rozróżnia się po kwiecie lub owocu. Pasek pewności pokazuje ocenę modelu, a przy
@@ -94,7 +111,7 @@ Ocena kondycji opiera się wyłącznie na tym, co widać na zdjęciu.
 Aplikacja celowo nie potwierdza jadalności ani zastosowań leczniczych. Pomyłka
 w oznaczeniu rośliny jadalnej bywa groźna, a modele mylą gatunki podobne.
 
-## 8. Kierunki rozwoju
+## 9. Kierunki rozwoju
 
 - **Pl@ntNet API** jako drugi silnik — baza naukowa, mocna w dzikiej florze
   Europy; dobrze sprawdza się w układzie: Pl@ntNet oznacza gatunek, model
