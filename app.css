@@ -95,6 +95,29 @@ button{ font:inherit; color:inherit; }
 .btn--primary:hover{ background:#4A9880; }
 .btn--ghost{ background:none; color:var(--on-ink-dim); padding:12px 20px; margin-top:6px; }
 .btn--ghost:hover{ color:var(--on-ink); }
+.btn--line{
+  background:none; color:var(--on-ink);
+  border:1px solid var(--ink-3); padding:12px 20px;
+}
+.btn--line:hover{ border-color:var(--verd); color:var(--verd); }
+.btn--line[disabled]{ opacity:.5; cursor:default; }
+
+.models{ margin-top:14px; }
+.models__head{
+  margin:0 0 9px; font-family:var(--mono); font-size:10.5px;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--on-ink-dim);
+}
+.models__list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:1px; }
+.models__list button{
+  width:100%; text-align:left; appearance:none; border:none; cursor:pointer;
+  background:var(--ink-2); color:var(--on-ink);
+  padding:11px 13px; font-family:var(--mono); font-size:12.5px;
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+}
+.models__list button:hover{ background:var(--ink-3); }
+.models__list button[aria-current="true"]{ color:var(--verd); }
+.models__list em{ font-style:normal; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--pollen); }
+
 .btn--danger{
   background:none; color:var(--alarm);
   border:1px solid color-mix(in srgb, var(--alarm) 45%, transparent);

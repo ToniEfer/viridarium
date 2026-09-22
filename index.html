@@ -121,8 +121,13 @@
     <label class="field">
       <span class="label">Model</span>
       <input type="text" id="model" class="input" autocomplete="off" spellcheck="false">
-      <span class="help">Jeśli silnik odrzuci nazwę modelu, wpisz tu aktualny identyfikator.</span>
+      <span class="help">Zostaw puste, żeby użyć domyślnego. Nie wiesz którego? Sprawdź, co udostępnia twój klucz.</span>
     </label>
+
+    <div class="field">
+      <button id="btn-models" class="btn btn--line">Sprawdź modele</button>
+      <div id="models-out" class="models" hidden></div>
+    </div>
 
     <div class="field">
       <span class="label">Zielnik</span>

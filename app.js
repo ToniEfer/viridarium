@@ -13,6 +13,7 @@ const el = {
   sheetWrap: $('#sheet-wrap'), sheetScroll: $('#sheet-scroll'),
   herbarium: $('#herbarium'), herbGrid: $('#herb-grid'), herbEmpty: $('#herb-empty'), herbCount: $('#herb-count'),
   settings: $('#settings'), apikey: $('#apikey'), model: $('#model'), providerHelp: $('#provider-help'),
+  modelsBtn: $('#btn-models'), modelsOut: $('#models-out'),
   busy: $('#busy'), busyImg: $('#busy-img'), busyStep: $('#busy-step'),
   toast: $('#toast')
 };
@@ -187,6 +188,11 @@ async function analizuj(dataUrl){
       data: new Date().toISOString()
     };
     okaz.id = await dodajOkaz(okaz);
+    if(dane._model && dane._model !== ustawienia.model){
+      el.model.value = dane._model;
+      zapiszUstawienia();
+      komunikat(`Przełączono na model ${dane._model}.`);
+    }
     ostatniOkaz = okaz;
     await odswiezLicznik();
     pokazArkusz(okaz);
@@ -394,6 +400,14 @@ document.addEventListener('click', async e => {
     if(okaz){ zamknijNakladki(); pokazArkusz(okaz); }
   }
 
+  const wybor = e.target.closest('[data-model]');
+  if(wybor){
+    el.model.value = wybor.dataset.model;
+    zapiszUstawienia();
+    $$('[data-model]').forEach(b => b.setAttribute('aria-current', String(b === wybor)));
+    komunikat(`Wybrano model ${wybor.dataset.model}.`);
+  }
+
   const usun = e.target.closest('[data-usun]');
   if(usun){
     await usunOkaz(Number(usun.dataset.usun));
@@ -412,6 +426,38 @@ document.addEventListener('keydown', e => {
 $$('input[name="provider"]').forEach(i => i.addEventListener('change', zapiszUstawienia));
 el.apikey.addEventListener('input', zapiszUstawienia);
 el.model.addEventListener('input', zapiszUstawienia);
+
+el.modelsBtn.addEventListener('click', async () => {
+  if(!ustawienia.apiKey){ komunikat('Najpierw wklej klucz API.', true); return; }
+  if(ustawienia.provider !== 'gemini'){ komunikat('Sprawdzanie listy działa na razie tylko dla Gemini.', true); return; }
+
+  el.modelsBtn.disabled = true;
+  el.modelsBtn.textContent = 'Sprawdzam…';
+  try{
+    const nazwy = await listujModeleGemini(ustawienia.apiKey);
+    if(!nazwy.length){
+      el.modelsOut.hidden = true;
+      komunikat('Klucz działa, ale nie udostępnia żadnego modelu do analizy zdjęć.', true);
+      return;
+    }
+    const polecany = wybierzModelGemini(nazwy);
+    const aktualny = ustawienia.model || PROVIDERS.gemini.model;
+    el.modelsOut.innerHTML = `
+      <p class="models__head">Dostępne dla twojego klucza (${nazwy.length}) — stuknij, żeby wybrać</p>
+      <ul class="models__list">${nazwy.map(n => `
+        <li><button type="button" data-model="${esc(n)}" aria-current="${n === aktualny}">
+          <span>${esc(n)}</span>${n === polecany ? '<em>polecany</em>' : ''}
+        </button></li>`).join('')}</ul>`;
+    el.modelsOut.hidden = false;
+    komunikat(`Znaleziono ${nazwy.length} modeli. Polecany: ${polecany}.`);
+  }catch(e){
+    el.modelsOut.hidden = true;
+    komunikat(e.message, true);
+  }finally{
+    el.modelsBtn.disabled = false;
+    el.modelsBtn.textContent = 'Sprawdź modele';
+  }
+});
 
 $('#btn-clear').addEventListener('click', async () => {
   await wyczyscOkazy();

@@ -84,10 +84,45 @@ async function bladHTTP(res, domyslny){
   if(res.status === 401 || res.status === 403)
     throw new Error('Klucz API został odrzucony. Sprawdź go w ustawieniach.');
   if(res.status === 404)
-    throw new Error('Silnik nie zna tego modelu. Wpisz aktualny identyfikator w ustawieniach.');
+    throw new Error(szczegol
+      ? `Silnik nie zna tego modelu: ${szczegol}`
+      : 'Silnik nie zna tego modelu. Użyj przycisku „Sprawdź modele" w ustawieniach.');
   if(res.status === 429)
     throw new Error('Przekroczony limit zapytań. Spróbuj za chwilę.');
   throw new Error(szczegol ? `${domyslny} ${szczegol}` : domyslny);
+}
+
+/* ---------- lista modeli Gemini ---------- */
+
+const ODPADA = /image|imagen|tts|audio|embedding|embed|aqa|veo|live/i;
+
+/* Pobiera modele, które ten klucz może wywołać przez generateContent. */
+async function listujModeleGemini(apiKey){
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
+    headers: { 'x-goog-api-key': apiKey }
+  });
+  if(!res.ok) await bladHTTP(res, 'Nie udało się pobrać listy modeli.');
+  const data = await res.json();
+  return (data.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => String(m.name).replace(/^models\//, ''))
+    .filter(n => !ODPADA.test(n));
+}
+
+/* Najnowszy „flash" wygrywa: tani, szybki, widzi obrazy. */
+function wybierzModelGemini(nazwy){
+  const wersja = n => {
+    const m = /gemini-(\d+(?:\.\d+)?)/.exec(n);
+    return m ? parseFloat(m[1]) : 0;
+  };
+  const punkty = n =>
+    (/flash/.test(n) ? 100 : /pro/.test(n) ? 50 : 0) +
+    (/lite/.test(n) ? -10 : 0) +
+    (/preview|exp/.test(n) ? -25 : 0);
+
+  return [...nazwy].sort((a, b) =>
+    (punkty(b) - punkty(a)) || (wersja(b) - wersja(a)) || a.length - b.length
+  )[0];
 }
 
 /* ---------- Gemini ---------- */
@@ -147,9 +182,19 @@ async function recognize({ dataUrl, provider, apiKey, model }){
 
   let wynik;
   try{
-    wynik = provider === 'anthropic'
-      ? await przezAnthropic({ base64, mime, apiKey, model: uzytyModel })
-      : await przezGemini({ base64, mime, apiKey, model: uzytyModel });
+    try{
+      wynik = provider === 'anthropic'
+        ? await przezAnthropic({ base64, mime, apiKey, model: uzytyModel })
+        : await przezGemini({ base64, mime, apiKey, model: uzytyModel });
+    }catch(e){
+      // Google bywa, że zmienia nazwy modeli. Jeśli ta nie istnieje, znajdź czynną i powtórz.
+      if(provider !== 'gemini' || !/nie zna tego modelu/i.test(e.message)) throw e;
+      const dostepne = await listujModeleGemini(apiKey);
+      const zamiennik = wybierzModelGemini(dostepne);
+      if(!zamiennik || zamiennik === uzytyModel) throw e;
+      wynik = await przezGemini({ base64, mime, apiKey, model: zamiennik });
+      wynik._model = zamiennik;
+    }
   }catch(e){
     if(e instanceof TypeError)
       throw new Error('Brak połączenia z silnikiem. Sprawdź internet.');
