@@ -173,12 +173,16 @@ async function analizuj(dataUrl){
     el.busyStep.textContent = KROKI[krok];
   }, 2200);
 
+  // gdy silnik każe czekać, licznik kroków ustępuje miejsca prawdziwemu stanowi
+  const naStatus = tekst => { clearInterval(tyka); el.busyStep.textContent = tekst; };
+
   try{
     const dane = await recognize({
       dataUrl,
       provider: ustawienia.provider,
       apiKey: ustawienia.apiKey,
-      model: ustawienia.model
+      model: ustawienia.model,
+      naStatus
     });
 
     const okaz = {

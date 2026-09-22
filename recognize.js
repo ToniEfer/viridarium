@@ -74,6 +74,8 @@ function wyciagnijJSON(tekst){
   return JSON.parse(t.slice(start, end + 1));
 }
 
+function spij(ms){ return new Promise(r => setTimeout(r, ms)); }
+
 async function bladHTTP(res, domyslny){
   let szczegol = '';
   try{
@@ -87,8 +89,16 @@ async function bladHTTP(res, domyslny){
     throw new Error(szczegol
       ? `Silnik nie zna tego modelu: ${szczegol}`
       : 'Silnik nie zna tego modelu. Użyj przycisku „Sprawdź modele" w ustawieniach.');
-  if(res.status === 429)
-    throw new Error('Przekroczony limit zapytań. Spróbuj za chwilę.');
+  if(res.status === 429){
+    const e = new Error('Limit zapytań wyczerpany. Silnik prosi o przerwę.');
+    e.przeciazony = true;
+    throw e;
+  }
+  if(res.status === 503 || res.status === 500 || /high demand|overload|unavailable/i.test(szczegol)){
+    const e = new Error('Silnik jest w tej chwili przeciążony.');
+    e.przeciazony = true;
+    throw e;
+  }
   throw new Error(szczegol ? `${domyslny} ${szczegol}` : domyslny);
 }
 
@@ -175,25 +185,51 @@ async function przezAnthropic({ base64, mime, apiKey, model }){
 
 /* ---------- wejście ---------- */
 
-async function recognize({ dataUrl, provider, apiKey, model }){
+const PRZERWY = [1500, 4000, 9000];   // silnik pod obciążeniem zwykle wraca w kilka sekund
+
+async function recognize({ dataUrl, provider, apiKey, model, naStatus = () => {} }){
   if(!apiKey) throw new Error('Brakuje klucza API. Otwórz ustawienia i wklej klucz.');
   const { base64, mime } = rozbijDataUrl(dataUrl);
   const uzytyModel = model || PROVIDERS[provider].model;
 
+  const zapytaj = m => provider === 'anthropic'
+    ? przezAnthropic({ base64, mime, apiKey, model: m })
+    : przezGemini({ base64, mime, apiKey, model: m });
+
   let wynik;
   try{
-    try{
-      wynik = provider === 'anthropic'
-        ? await przezAnthropic({ base64, mime, apiKey, model: uzytyModel })
-        : await przezGemini({ base64, mime, apiKey, model: uzytyModel });
-    }catch(e){
-      // Google bywa, że zmienia nazwy modeli. Jeśli ta nie istnieje, znajdź czynną i powtórz.
-      if(provider !== 'gemini' || !/nie zna tego modelu/i.test(e.message)) throw e;
-      const dostepne = await listujModeleGemini(apiKey);
-      const zamiennik = wybierzModelGemini(dostepne);
-      if(!zamiennik || zamiennik === uzytyModel) throw e;
-      wynik = await przezGemini({ base64, mime, apiKey, model: zamiennik });
-      wynik._model = zamiennik;
+    let ostatni;
+
+    // Podejście po podejściu tym samym modelem — przeciążenie zwykle mija samo.
+    for(let i = 0; i <= PRZERWY.length; i++){
+      try{ wynik = await zapytaj(uzytyModel); break; }
+      catch(e){
+        ostatni = e;
+        if(!e.przeciazony || i === PRZERWY.length) break;
+        naStatus(`Silnik zajęty — ponawiam (${i + 1}/${PRZERWY.length})`);
+        await spij(PRZERWY[i]);
+      }
+    }
+
+    // Wciąż nic? Spróbuj innym modelem z tych, które udostępnia klucz.
+    if(!wynik && provider === 'gemini' && ostatni &&
+       (ostatni.przeciazony || /nie zna tego modelu/i.test(ostatni.message))){
+      const dostepne = await listujModeleGemini(apiKey).catch(() => []);
+      const kandydaci = dostepne.filter(n => n !== uzytyModel).slice(0, 3);
+      for(const kandydat of kandydaci){
+        naStatus(`Przechodzę na ${kandydat}`);
+        try{
+          wynik = await zapytaj(kandydat);
+          wynik._model = kandydat;
+          break;
+        }catch(e){ ostatni = e; }
+      }
+    }
+
+    if(!wynik){
+      if(ostatni?.przeciazony)
+        throw new Error('Silniki Google są teraz oblegane i odrzucają zapytania. Spróbuj za kilka minut — zdjęcie nie przepadnie, wystarczy nacisnąć Analizuj ponownie.');
+      throw ostatni || new Error('Nie udało się wykonać analizy.');
     }
   }catch(e){
     if(e instanceof TypeError)
