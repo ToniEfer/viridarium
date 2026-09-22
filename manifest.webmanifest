@@ -1,0 +1,18 @@
+{
+  "name": "Zielnik — rozpoznawanie roślin",
+  "short_name": "Zielnik",
+  "description": "Skieruj aparat na roślinę: oznaczenie gatunku, siedlisko, uprawa i ocena kondycji na arkuszu zielnikowym.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101A17",
+  "theme_color": "#101A17",
+  "lang": "pl",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

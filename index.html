@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>Zielnik — rozpoznawanie roślin</title>
+<meta name="description" content="Skieruj aparat na roślinę, a aplikacja rozpozna gatunek i opisze uprawę, siedlisko i kondycję.">
+<meta name="theme-color" content="#101A17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zielnik">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=Karla:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============ EKRAN STARTOWY ============ -->
+<section id="intro" class="screen screen--intro">
+  <div class="intro__mark" aria-hidden="true">
+    <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.25">
+      <path d="M32 58V26"/>
+      <path d="M32 30c0-10 7-18 17-19 1 10-5 19-17 19z"/>
+      <path d="M32 42c0-8-6-14-14-15-1 8 4 15 14 15z"/>
+      <circle cx="32" cy="20" r="1.5" fill="currentColor" stroke="none"/>
+    </svg>
+  </div>
+  <h1 class="intro__title">Zielnik</h1>
+  <p class="intro__lead">Skieruj aparat na roślinę. Dostaniesz oznaczenie gatunku i arkusz z opisem&nbsp;— siedlisko, uprawa, kondycja.</p>
+  <button id="btn-start" class="btn btn--primary">Włącz aparat</button>
+  <button id="btn-intro-file" class="btn btn--ghost">Wybierz zdjęcie z galerii</button>
+  <p class="intro__note" id="intro-note"></p>
+</section>
+
+<!-- ============ EKRAN APARATU ============ -->
+<main id="camera" class="screen screen--camera" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="frame" aria-hidden="true">
+    <span class="frame__c frame__c--tl"></span>
+    <span class="frame__c frame__c--tr"></span>
+    <span class="frame__c frame__c--bl"></span>
+    <span class="frame__c frame__c--br"></span>
+    <span class="frame__scan" id="scanline"></span>
+  </div>
+
+  <header class="topbar">
+    <button id="btn-herbarium" class="icon-btn" aria-label="Otwórz zielnik">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 4h11l3 3v13H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+      <span class="icon-btn__count" id="herb-count" hidden>0</span>
+    </button>
+    <p class="topbar__hint" id="hint">Wypełnij kadr liściem lub kwiatem</p>
+    <button id="btn-settings" class="icon-btn" aria-label="Ustawienia">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2 5.6 5.6"/></svg>
+    </button>
+  </header>
+
+  <footer class="shutterbar">
+    <button id="btn-file" class="icon-btn icon-btn--lg" aria-label="Wybierz zdjęcie z galerii">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/><path d="m3.5 15 4.5-4 4 3.5 3.5-3 5 4.5"/><circle cx="9" cy="9.5" r="1.3"/></svg>
+    </button>
+    <button id="btn-analyze" class="shutter">
+      <span class="shutter__ring"></span>
+      <span class="shutter__label">Analizuj</span>
+    </button>
+    <button id="btn-flip" class="icon-btn icon-btn--lg" aria-label="Przełącz kamerę">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 9a8 8 0 0 1 13.5-4.5L20 7"/><path d="M20 4v3.5h-3.5"/><path d="M20 15a8 8 0 0 1-13.5 4.5L4 17"/><path d="M4 20v-3.5h3.5"/></svg>
+    </button>
+  </footer>
+
+  <input type="file" id="file-input" accept="image/*" hidden>
+</main>
+
+<!-- ============ ARKUSZ WYNIKU ============ -->
+<div id="sheet-wrap" class="sheet-wrap" hidden>
+  <div class="sheet-wrap__scrim" data-close-sheet></div>
+  <article id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="s-name-pl">
+    <button class="sheet__grip" data-close-sheet aria-label="Zamknij arkusz"></button>
+    <div class="sheet__scroll" id="sheet-scroll"></div>
+  </article>
+</div>
+
+<!-- ============ ZIELNIK ============ -->
+<section id="herbarium" class="screen screen--overlay" hidden>
+  <header class="overlay-head">
+    <h2>Zielnik</h2>
+    <button class="icon-btn" data-close-overlay aria-label="Zamknij"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+  </header>
+  <div id="herb-grid" class="herb-grid"></div>
+  <p id="herb-empty" class="empty">Nie masz jeszcze okazów. Każde rozpoznanie dopisze tu arkusz.</p>
+</section>
+
+<!-- ============ USTAWIENIA ============ -->
+<section id="settings" class="screen screen--overlay" hidden>
+  <header class="overlay-head">
+    <h2>Ustawienia</h2>
+    <button class="icon-btn" data-close-overlay aria-label="Zamknij"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+  </header>
+
+  <div class="form">
+    <fieldset class="field">
+      <legend class="label">Silnik rozpoznawania</legend>
+      <div class="segmented">
+        <label><input type="radio" name="provider" value="gemini"><span>Gemini</span></label>
+        <label><input type="radio" name="provider" value="anthropic"><span>Claude</span></label>
+      </div>
+      <p class="help" id="provider-help"></p>
+    </fieldset>
+
+    <label class="field">
+      <span class="label">Klucz API</span>
+      <input type="password" id="apikey" class="input" autocomplete="off" spellcheck="false" placeholder="wklej klucz">
+      <span class="help">Zapisywany tylko w pamięci tej przeglądarki. Nie wysyłamy go nigdzie poza wybrany silnik.</span>
+    </label>
+
+    <label class="field">
+      <span class="label">Model</span>
+      <input type="text" id="model" class="input" autocomplete="off" spellcheck="false">
+      <span class="help">Jeśli silnik odrzuci nazwę modelu, wpisz tu aktualny identyfikator.</span>
+    </label>
+
+    <div class="field">
+      <span class="label">Zielnik</span>
+      <button id="btn-clear" class="btn btn--danger">Usuń wszystkie okazy</button>
+    </div>
+
+    <p class="fineprint">Oznaczenie i opis pochodzą z modelu AI i bywają błędne. Nigdy nie decyduj o spożyciu ani zastosowaniu leczniczym rośliny na podstawie tej aplikacji.</p>
+  </div>
+</section>
+
+<!-- ============ ANALIZA W TOKU ============ -->
+<div id="busy" class="busy" hidden>
+  <div class="busy__card">
+    <div class="busy__thumb"><img id="busy-img" alt=""></div>
+    <p class="busy__step" id="busy-step">Przygotowuję okaz</p>
+    <div class="busy__bar"><span></span></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="recognize.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
