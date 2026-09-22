@@ -80,30 +80,66 @@ const wyczyscOkazy = () => transakcja('readwrite', s => s.clear());
 
 /* ---------------- aparat ---------------- */
 
-async function wlaczKamere(){
+async function wlaczKamere({ nowaKamera = kamera, cicho = false } = {}){
   if(!navigator.mediaDevices?.getUserMedia){
-    el.introNote.textContent = 'Ta przeglądarka nie udostępnia aparatu. Użyj zdjęcia z galerii.';
+    zglos('Ta przeglądarka nie udostępnia aparatu. Użyj zdjęcia z galerii.', cicho);
     return false;
   }
   if(!window.isSecureContext){
-    el.introNote.textContent = 'Aparat działa tylko przez HTTPS lub na localhost. Patrz README. Zdjęcie z galerii działa zawsze.';
+    zglos('Aparat działa tylko przez HTTPS lub na localhost. Zdjęcie z galerii działa zawsze.', cicho);
     return false;
   }
   try{
-    strumien?.getTracks().forEach(t => t.stop());
-    strumien = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: kamera }, width: { ideal: 1920 }, height: { ideal: 1920 } },
+    // Nowy strumień bierzemy PRZED zgaszeniem starego — gdyby się nie udało,
+    // zostajemy przy obrazie, który już mamy, zamiast z czarnym ekranem.
+    const swiezy = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: nowaKamera }, width: { ideal: 1920 }, height: { ideal: 1920 } },
       audio: false
     });
+    if(strumien && strumien !== swiezy) strumien.getTracks().forEach(t => t.stop());
+    strumien = swiezy;
+    kamera = nowaKamera;
     el.video.srcObject = strumien;
+    pilnujStrumienia();
     await el.video.play().catch(() => {});
     return true;
   }catch(e){
-    el.introNote.textContent = e.name === 'NotAllowedError'
-      ? 'Brak zgody na dostęp do aparatu. Zmień to w ustawieniach strony.'
-      : 'Nie udało się uruchomić aparatu. Użyj zdjęcia z galerii.';
+    const tekst = e.name === 'NotAllowedError'
+      ? 'Brak zgody na dostęp do aparatu. Stuknij ikonę po lewej stronie adresu → Uprawnienia → Kamera.'
+      : e.name === 'NotReadableError'
+        ? 'Aparat jest zajęty przez inną aplikację. Zamknij ją i spróbuj ponownie.'
+        : 'Nie udało się uruchomić aparatu. Użyj zdjęcia z galerii.';
+    zglos(tekst, cicho);
     return false;
   }
+}
+
+/* Komunikat trafia tam, gdzie użytkownik akurat patrzy. */
+function zglos(tekst, cicho){
+  if(cicho) return;
+  if(el.camera.hidden) el.introNote.textContent = tekst;
+  else komunikat(tekst, true);
+}
+
+function kameraZywa(){
+  return !!strumien?.getVideoTracks().some(t => t.readyState === 'live');
+}
+
+/* Android usypia kamerę, gdy schodzisz do innej aplikacji. Wracamy — wznawiamy. */
+function pilnujStrumienia(){
+  strumien.getVideoTracks().forEach(t => {
+    t.onended = () => { if(!el.camera.hidden) wznow(); };
+  });
+}
+
+let wznawianie = false;
+async function wznow(){
+  if(wznawianie || kameraZywa()) return;
+  wznawianie = true;
+  el.hint.textContent = 'Wznawiam podgląd…';
+  const ok = await wlaczKamere({ cicho: true });
+  el.hint.textContent = ok ? HINT : 'Stuknij kadr, żeby wznowić podgląd';
+  wznawianie = false;
 }
 
 function pokazKamere(){
@@ -151,6 +187,8 @@ function zPliku(plik){
 }
 
 /* ---------------- analiza ---------------- */
+
+const HINT = 'Wypełnij kadr liściem lub kwiatem';
 
 const KROKI = ['Przygotowuję okaz', 'Porównuję cechy', 'Oznaczam gatunek', 'Spisuję arkusz'];
 
@@ -385,10 +423,14 @@ el.analyze.addEventListener('click', async () => {
   catch(e){ komunikat(e.message, true); }
 });
 
-el.flip.addEventListener('click', async () => {
-  kamera = kamera === 'environment' ? 'user' : 'environment';
-  await wlaczKamere();
+el.flip.addEventListener('click', () =>
+  wlaczKamere({ nowaKamera: kamera === 'environment' ? 'user' : 'environment' }));
+
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && !el.camera.hidden) wznow();
 });
+
+el.video.addEventListener('click', wznow);
 
 $('#btn-herbarium').addEventListener('click', pokazZielnik);
 $('#btn-settings').addEventListener('click', () => otworzNakladke(el.settings));

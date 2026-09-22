@@ -1,6 +1,6 @@
 /* Service worker: powłoka aplikacji offline. Zapytania do silników
    rozpoznawania zawsze idą do sieci — nie są i nie mogą być cache'owane. */
-const CACHE = 'viridarium-v3';
+const CACHE = 'viridarium-v4';
 const POWLOKA = [
   './', './index.html', './app.css', './app.js', './recognize.js',
   './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'
