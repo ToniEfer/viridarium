@@ -7,6 +7,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 const el = {
   intro: $('#intro'), introNote: $('#intro-note'),
+  introHerb: $('#btn-intro-herb'), introHerbCount: $('#intro-herb-count'),
   camera: $('#camera'), video: $('#video'), hint: $('#hint'),
   analyze: $('#btn-analyze'), flip: $('#btn-flip'),
   fileInput: $('#file-input'),
@@ -361,10 +362,21 @@ function zamknijArkusz(){
 
 /* ---------------- zielnik ---------------- */
 
+function odmianaOkazow(n){
+  const jed = n % 10, dwie = n % 100;
+  if(n === 1) return 'okaz';
+  if(jed >= 2 && jed <= 4 && !(dwie >= 12 && dwie <= 14)) return 'okazy';
+  return 'okazów';
+}
+
 async function odswiezLicznik(){
   const okazy = await wszystkieOkazy();
   el.herbCount.textContent = okazy.length;
   el.herbCount.hidden = okazy.length === 0;
+
+  // na ekranie startowym zielnik pokazuje się dopiero, gdy jest co pokazywać
+  el.introHerb.hidden = okazy.length === 0;
+  el.introHerbCount.textContent = `· ${okazy.length} ${odmianaOkazow(okazy.length)}`;
   return okazy;
 }
 
@@ -433,6 +445,7 @@ document.addEventListener('visibilitychange', () => {
 el.video.addEventListener('click', wznow);
 
 $('#btn-herbarium').addEventListener('click', pokazZielnik);
+el.introHerb.addEventListener('click', pokazZielnik);   // zielnik bez uruchamiania aparatu
 $('#btn-settings').addEventListener('click', () => otworzNakladke(el.settings));
 
 document.addEventListener('click', async e => {
@@ -443,7 +456,7 @@ document.addEventListener('click', async e => {
   if(karta){
     const okazy = await wszystkieOkazy();
     const okaz = okazy.find(o => o.id === Number(karta.dataset.okaz));
-    if(okaz){ zamknijNakladki(); pokazArkusz(okaz); }
+    if(okaz){ zamknijNakladki(); pokazArkusz(okaz); }   // pod spodem zostaje ten ekran, z którego przyszliśmy
   }
 
   const wybor = e.target.closest('[data-model]');
