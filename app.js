@@ -2,7 +2,7 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
-const WERSJA = '1.6.0';   // musi zgadzać się z WERSJA w sw.js
+const WERSJA = '1.6.1';   // musi zgadzać się z WERSJA w sw.js
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -378,9 +378,11 @@ async function odswiezLicznik(){
   el.herbCount.textContent = okazy.length;
   el.herbCount.hidden = okazy.length === 0;
 
-  // na ekranie startowym zielnik pokazuje się dopiero, gdy jest co pokazywać
-  el.introHerb.hidden = okazy.length === 0;
-  el.introHerbCount.textContent = `· ${okazy.length} ${odmianaOkazow(okazy.length)}`;
+  // wejście do zielnika jest zawsze widoczne — pusty zielnik sam powie, że jest pusty
+  el.introHerb.hidden = false;
+  el.introHerbCount.textContent = okazy.length
+    ? `· ${okazy.length} ${odmianaOkazow(okazy.length)}`
+    : '';
   return okazy;
 }
 
