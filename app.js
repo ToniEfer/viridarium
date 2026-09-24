@@ -2,7 +2,7 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
-const WERSJA = '1.6.1';   // musi zgadzać się z WERSJA w sw.js
+const WERSJA = '1.6.2';   // musi zgadzać się z WERSJA w sw.js
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -18,6 +18,7 @@ const el = {
   settings: $('#settings'), apikey: $('#apikey'), model: $('#model'), providerHelp: $('#provider-help'),
   modelsBtn: $('#btn-models'), modelsOut: $('#models-out'),
   wersjaInfo: $('#wersja-info'), checkUpd: $('#btn-check-update'),
+  introVer: $('#intro-ver'),
   updbar: $('#updbar'),
   busy: $('#busy'), busyImg: $('#busy-img'), busyStep: $('#busy-step'),
   toast: $('#toast')
@@ -536,7 +537,47 @@ $('#btn-clear').addEventListener('click', async () => {
 
 wczytajUstawienia();
 odswiezLicznik();
-el.wersjaInfo.textContent = `Viridarium ${WERSJA}${window.matchMedia('(display-mode: standalone)').matches ? ' · zainstalowana' : ''}`;
+pokazWersje();
+
+/* ---------------- wersja ---------------- */
+
+/* Pyta service workera, jaką wersję plików faktycznie serwuje.
+   Rozjazd z WERSJA oznacza, że aplikacja chodzi na starym rdzeniu. */
+function wersjaRdzenia(){
+  return new Promise(gotowe => {
+    const sw = navigator.serviceWorker?.controller;
+    if(!sw) return gotowe(null);
+    const kanal = e => {
+      if(e.data?.typ === 'WERSJA'){
+        navigator.serviceWorker.removeEventListener('message', kanal);
+        gotowe(e.data.wersja);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', kanal);
+    sw.postMessage({ typ: 'JAKA_WERSJA' });
+    setTimeout(() => {
+      navigator.serviceWorker.removeEventListener('message', kanal);
+      gotowe(null);
+    }, 1500);
+  });
+}
+
+async function pokazWersje(){
+  const zainstalowana = window.matchMedia('(display-mode: standalone)').matches;
+  el.introVer.textContent = `wersja ${WERSJA}`;
+  el.wersjaInfo.textContent = `Viridarium ${WERSJA}${zainstalowana ? ' · zainstalowana' : ' · w przeglądarce'}`;
+
+  const rdzen = await wersjaRdzenia();
+  if(!rdzen){
+    el.wersjaInfo.textContent += ' · bez trybu offline';
+    return;
+  }
+  if(rdzen !== WERSJA){
+    el.introVer.textContent = `wersja ${WERSJA} · rdzeń ${rdzen} — odśwież`;
+    el.introVer.classList.add('is-rozjazd');
+    el.wersjaInfo.textContent += ` · rdzeń ${rdzen}, niezgodny`;
+  }
+}
 
 /* ---------------- aktualizacje ---------------- */
 
@@ -598,7 +639,10 @@ function poZainstalowaniu(sw){
   });
 }
 
-el.checkUpd.addEventListener('click', () => sprawdzAktualizacje({ recznie: true }));
+el.checkUpd.addEventListener('click', async () => {
+  await sprawdzAktualizacje({ recznie: true });
+  pokazWersje();
+});
 
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
   window.addEventListener('load', async () => {
