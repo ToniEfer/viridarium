@@ -2,6 +2,8 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
+const WERSJA = '1.6.0';   // musi zgadzać się z WERSJA w sw.js
+
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
@@ -15,6 +17,8 @@ const el = {
   herbarium: $('#herbarium'), herbGrid: $('#herb-grid'), herbEmpty: $('#herb-empty'), herbCount: $('#herb-count'),
   settings: $('#settings'), apikey: $('#apikey'), model: $('#model'), providerHelp: $('#provider-help'),
   modelsBtn: $('#btn-models'), modelsOut: $('#models-out'),
+  wersjaInfo: $('#wersja-info'), checkUpd: $('#btn-check-update'),
+  updbar: $('#updbar'),
   busy: $('#busy'), busyImg: $('#busy-img'), busyStep: $('#busy-step'),
   toast: $('#toast')
 };
@@ -530,7 +534,102 @@ $('#btn-clear').addEventListener('click', async () => {
 
 wczytajUstawienia();
 odswiezLicznik();
+el.wersjaInfo.textContent = `Viridarium ${WERSJA}${window.matchMedia('(display-mode: standalone)').matches ? ' · zainstalowana' : ''}`;
+
+/* ---------------- aktualizacje ---------------- */
+
+let rejestracja = null;
+let czekajacy = null;      // nowy service worker gotowy do wejścia
+let juzPrzeladowano = false;
+let ostatnieSprawdzenie = 0;
+
+function pokazPasekAktualizacji(sw){
+  czekajacy = sw;
+  el.updbar.hidden = false;
+}
+
+/* Nowa wersja wchodzi dopiero, gdy użytkownik ją przyjmie — nigdy w trakcie analizy. */
+$('#btn-update').addEventListener('click', () => {
+  if(!czekajacy) { location.reload(); return; }
+  el.updbar.hidden = true;
+  komunikat('Wgrywam nową wersję…');
+  czekajacy.postMessage({ typ: 'WPUSC_NOWA' });
+});
+
+$('#btn-update-later').addEventListener('click', () => { el.updbar.hidden = true; });
+
+async function sprawdzAktualizacje({ recznie = false } = {}){
+  if(!rejestracja) {
+    if(recznie) komunikat('Aktualizacje działają dopiero po zainstalowaniu aplikacji.', true);
+    return;
+  }
+  const teraz = Date.now();
+  if(!recznie && teraz - ostatnieSprawdzenie < 15 * 60 * 1000) return;   // nie częściej niż co kwadrans
+  ostatnieSprawdzenie = teraz;
+
+  try{
+    await rejestracja.update();
+
+    // update() wraca, zanim nowy worker skończy się instalować — trzeba na niego poczekać,
+    // inaczej aplikacja ogłasza „masz najnowszą wersję" tuż przed pokazaniem paska.
+    const nowy = rejestracja.waiting || rejestracja.installing;
+    if(nowy){
+      const stan = await poZainstalowaniu(nowy);
+      if(stan === 'installed' || stan === 'activated'){
+        pokazPasekAktualizacji(rejestracja.waiting || nowy);
+        if(recznie) komunikat('Nowa wersja gotowa — stuknij Odśwież.');
+        return;
+      }
+    }
+    if(recznie) komunikat(`Masz najnowszą wersję (${WERSJA}).`);
+  }catch{
+    if(recznie) komunikat('Nie udało się sprawdzić aktualizacji. Sprawdź połączenie.', true);
+  }
+}
+
+function poZainstalowaniu(sw){
+  return new Promise(gotowe => {
+    if(sw.state !== 'installing') return gotowe(sw.state);
+    sw.addEventListener('statechange', () => {
+      if(sw.state !== 'installing') gotowe(sw.state);
+    });
+  });
+}
+
+el.checkUpd.addEventListener('click', () => sprawdzAktualizacje({ recznie: true }));
 
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', async () => {
+    try{
+      rejestracja = await navigator.serviceWorker.register('sw.js');
+
+      // wersja już czekała z poprzedniego uruchomienia
+      if(rejestracja.waiting && navigator.serviceWorker.controller)
+        pokazPasekAktualizacji(rejestracja.waiting);
+
+      // wersja pojawia się w trakcie działania aplikacji
+      rejestracja.addEventListener('updatefound', () => {
+        const swiezy = rejestracja.installing;
+        if(!swiezy) return;
+        swiezy.addEventListener('statechange', () => {
+          if(swiezy.state === 'installed' && navigator.serviceWorker.controller)
+            pokazPasekAktualizacji(swiezy);
+        });
+      });
+
+      sprawdzAktualizacje();
+    }catch{ /* brak service workera nie psuje aplikacji */ }
+  });
+
+  // po przejęciu przez nową wersję strona wczytuje się raz, sama
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(juzPrzeladowano) return;
+    juzPrzeladowano = true;
+    location.reload();
+  });
 }
+
+// powrót do aplikacji to najlepszy moment na sprawdzenie, czy coś się zmieniło
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') sprawdzAktualizacje();
+});

@@ -74,14 +74,22 @@ wtedy podmienić adres i usunąć nagłówki z kluczem.
 
 ## 6. Aktualizacja po zmianach
 
-Service worker trzyma pliki w pamięci podręcznej, żeby aplikacja działała bez
-sieci. Po każdej podmianie plików zmień w `sw.js` pierwszą linię:
+Podbij numer wersji w **dwóch** plikach — muszą być identyczne:
 
 ```js
-const CACHE = 'viridarium-v1';   // → 'viridarium-v2', 'v3', ...
+// sw.js
+const WERSJA = '1.6.0';   // → '1.6.1'
+// app.js
+const WERSJA = '1.6.0';   // → '1.6.1'
 ```
 
-Bez tego telefon może pokazywać starą wersję mimo wgrania nowej.
+To wszystko. Zainstalowana aplikacja sama zauważy zmianę: przy uruchomieniu
+i przy powrocie z tła sprawdza, czy na serwerze jest coś nowego (nie częściej
+niż raz na kwadrans), a gdy znajdzie, pokazuje u góry pasek „Jest nowa wersja"
+z przyciskiem *Odśwież*. Nowa wersja nigdy nie wchodzi sama w trakcie pracy —
+czeka, aż użytkownik ją przyjmie, żeby nie przerwać trwającej analizy.
+
+Ręczne sprawdzenie jest w ustawieniach, pod numerem wersji.
 
 ## 7. Pliki
 

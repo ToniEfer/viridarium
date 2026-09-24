@@ -137,6 +137,12 @@
       <button id="btn-clear" class="btn btn--danger">Usuń wszystkie okazy</button>
     </div>
 
+    <div class="field">
+      <span class="label">Wersja</span>
+      <p class="help" id="wersja-info">—</p>
+      <button id="btn-check-update" class="btn btn--line">Sprawdź aktualizacje</button>
+    </div>
+
     <p class="fineprint">Oznaczenie i opis pochodzą z modelu AI i bywają błędne. Nigdy nie decyduj o spożyciu ani zastosowaniu leczniczym rośliny na podstawie tej aplikacji.</p>
   </div>
 </section>
@@ -148,6 +154,14 @@
     <p class="busy__step" id="busy-step">Przygotowuję okaz</p>
     <div class="busy__bar"><span></span></div>
   </div>
+</div>
+
+<div id="updbar" class="updbar" hidden role="status">
+  <span class="updbar__txt">Jest nowa wersja</span>
+  <button id="btn-update" class="updbar__ok">Odśwież</button>
+  <button id="btn-update-later" class="updbar__x" aria-label="Później">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 6 12 12M18 6 6 18"/></svg>
+  </button>
 </div>
 
 <div id="toast" class="toast" hidden></div>

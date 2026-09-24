@@ -474,6 +474,34 @@ button{ font:inherit; color:inherit; }
   0%{ transform:translateX(-100%);} 100%{ transform:translateX(365%);}
 }
 
+/* ---------- pasek nowej wersji ---------- */
+.updbar{
+  position:fixed; top:0; left:0; right:0; z-index:70;
+  display:flex; align-items:center; gap:12px;
+  padding:calc(11px + var(--safe-t)) 12px 11px 18px;
+  background:var(--sheet); color:var(--type);
+  box-shadow:0 6px 24px rgba(0,0,0,.35);
+  animation:updbar-in .34s cubic-bezier(.16,.84,.34,1) both;
+}
+@keyframes updbar-in{ from{ transform:translateY(-100%); } }
+.updbar__txt{
+  flex:1; font-family:var(--mono); font-size:11.5px;
+  letter-spacing:.08em; text-transform:uppercase;
+}
+.updbar__ok{
+  appearance:none; border:none; cursor:pointer; flex:none;
+  background:var(--verd); color:#04110C;
+  padding:9px 16px; border-radius:2px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+}
+.updbar__ok:hover{ background:#4A9880; }
+.updbar__x{
+  appearance:none; border:none; background:none; cursor:pointer; flex:none;
+  width:32px; height:32px; display:grid; place-items:center; color:var(--type-dim);
+}
+.updbar__x svg{ width:17px; height:17px; }
+.updbar__x:hover{ color:var(--type); }
+
 /* ---------- toast ---------- */
 .toast{
   position:fixed; left:50%; bottom:calc(30px + var(--safe-b)); transform:translateX(-50%);

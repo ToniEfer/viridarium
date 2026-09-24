@@ -1,13 +1,17 @@
-/* Service worker: powłoka aplikacji offline. Zapytania do silników
-   rozpoznawania zawsze idą do sieci — nie są i nie mogą być cache'owane. */
-const CACHE = 'viridarium-v5';
+/* Service worker: powłoka aplikacji offline.
+   WERSJA musi być zgodna z tą w app.js — jej zmiana uruchamia aktualizację
+   u wszystkich, którzy mają aplikację zainstalowaną. */
+const WERSJA = '1.6.0';
+const CACHE = `viridarium-${WERSJA}`;
+
 const POWLOKA = [
   './', './index.html', './app.css', './app.js', './recognize.js',
   './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(POWLOKA)).then(() => self.skipWaiting()));
+  // Świadomie bez skipWaiting: nowa wersja czeka, aż użytkownik ją przyjmie.
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(POWLOKA)));
 });
 
 self.addEventListener('activate', e => {
@@ -16,6 +20,12 @@ self.addEventListener('activate', e => {
       .then(k => Promise.all(k.filter(n => n !== CACHE).map(n => caches.delete(n))))
       .then(() => self.clients.claim())
   );
+});
+
+// Aplikacja prosi o wpuszczenie nowej wersji, gdy użytkownik stuknie „Odśwież".
+self.addEventListener('message', e => {
+  if(e.data?.typ === 'WPUSC_NOWA') self.skipWaiting();
+  if(e.data?.typ === 'JAKA_WERSJA') e.source?.postMessage({ typ: 'WERSJA', wersja: WERSJA });
 });
 
 self.addEventListener('fetch', e => {
