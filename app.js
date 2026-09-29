@@ -2,7 +2,10 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
-const WERSJA = '1.6.2';   // musi zgadzać się z WERSJA w sw.js
+const WERSJA = '1.8.1';   // musi zgadzać się z WERSJA w sw.js
+
+/* Adres serwera pośredniczącego. Pusty = aplikacja wymaga własnego klucza API. */
+const SERWER_URL = 'https://viridarium.toniefer.workers.dev';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -16,6 +19,9 @@ const el = {
   sheetWrap: $('#sheet-wrap'), sheetScroll: $('#sheet-scroll'),
   herbarium: $('#herbarium'), herbGrid: $('#herb-grid'), herbEmpty: $('#herb-empty'), herbCount: $('#herb-count'),
   settings: $('#settings'), apikey: $('#apikey'), model: $('#model'), providerHelp: $('#provider-help'),
+  kluczDla: $('#klucz-dla'), awaryjny: $('#awaryjny'), testBtn: $('#btn-test'),
+  trybSerwer: $('#tryb-serwer'), limitInfo: $('#limit-info'),
+  zaaw: $('#zaawansowane'), zaawSum: $('#zaaw-sum'), zaawOpis: $('#zaaw-opis'),
   modelsBtn: $('#btn-models'), modelsOut: $('#models-out'),
   wersjaInfo: $('#wersja-info'), checkUpd: $('#btn-check-update'),
   introVer: $('#intro-ver'),
@@ -25,32 +31,104 @@ const el = {
 };
 
 const USTAWIENIA_KLUCZ = 'viridarium.ustawienia';
-let ustawienia = { provider: 'gemini', apiKey: '', model: '' };
+
+let ustawienia = {
+  provider: 'gemini',
+  klucze: { gemini: '', anthropic: '' },   // osobny klucz dla każdego silnika
+  modele: { gemini: '', anthropic: '' },
+  awaryjny: true
+};
+
 let strumien = null;
 let kamera = 'environment';
 let ostatniOkaz = null;
+let ostatnieZdjecie = null;   // do ponowienia po nieudanej analizie
+
+/* Losowy identyfikator tej instalacji — serwer liczy po nim dzienne analizy.
+   Nie zawiera żadnych danych o użytkowniku. */
+function idUrzadzenia(){
+  const K = 'viridarium.urzadzenie';
+  try{
+    let id = localStorage.getItem(K);
+    if(!id){
+      id = crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now();
+      localStorage.setItem(K, id);
+    }
+    return id;
+  }catch{ return 'bez-pamieci-' + Date.now(); }
+}
+
+const wlasnyKlucz = () => ustawienia.klucze[ustawienia.provider];
+const przezSerwerViridarium = () => SERWER_URL && !wlasnyKlucz();
 
 /* ---------------- ustawienia ---------------- */
 
 function wczytajUstawienia(){
   try{
     const zapisane = JSON.parse(localStorage.getItem(USTAWIENIA_KLUCZ) || '{}');
-    ustawienia = { ...ustawienia, ...zapisane };
+    ustawienia = {
+      ...ustawienia, ...zapisane,
+      klucze: { ...ustawienia.klucze, ...(zapisane.klucze || {}) },
+      modele: { ...ustawienia.modele, ...(zapisane.modele || {}) }
+    };
+    // przeniesienie z układu sprzed 1.7.0, gdzie klucz był jeden na oba silniki
+    if(zapisane.apiKey && !ustawienia.klucze[ustawienia.provider]){
+      ustawienia.klucze[ustawienia.provider] = zapisane.apiKey;
+      ustawienia.modele[ustawienia.provider] = zapisane.model || '';
+      delete ustawienia.apiKey; delete ustawienia.model;
+      zapisz();
+    }
   }catch{ /* pierwsze uruchomienie */ }
+
   $$('input[name="provider"]').forEach(i => { i.checked = i.value === ustawienia.provider; });
-  el.apikey.value = ustawienia.apiKey || '';
-  el.model.value = ustawienia.model || '';
-  el.model.placeholder = PROVIDERS[ustawienia.provider].model;
-  el.providerHelp.textContent = PROVIDERS[ustawienia.provider].skad;
+  el.awaryjny.checked = ustawienia.awaryjny !== false;
+  pokazPolaSilnika();
+  ukladUstawien();
+}
+
+function ukladUstawien(){
+  if(SERWER_URL){
+    el.trybSerwer.hidden = false;
+    el.zaaw.classList.remove('zaaw--wymagane');
+    el.zaawSum.textContent = 'Własny klucz API · opcjonalnie';
+    el.zaawOpis.hidden = false;
+  }else{
+    // bez serwera klucz jest jedyną drogą — pole musi być na wierzchu
+    el.trybSerwer.hidden = true;
+    el.zaaw.open = true;
+    el.zaaw.classList.add('zaaw--wymagane');
+    el.zaawSum.textContent = 'Klucz API';
+    el.zaawOpis.hidden = true;
+  }
+}
+
+/* Pola klucza i modelu zawsze pokazują dane silnika, który jest włączony. */
+function pokazPolaSilnika(){
+  const p = ustawienia.provider;
+  el.apikey.value = ustawienia.klucze[p] || '';
+  el.model.value = ustawienia.modele[p] || '';
+  el.model.placeholder = PROVIDERS[p].model;
+  el.providerHelp.textContent = PROVIDERS[p].skad;
+  el.kluczDla.textContent = `· ${PROVIDERS[p].nazwa}`;
+  el.modelsOut.hidden = true;
+}
+
+function zapisz(){
+  try{ localStorage.setItem(USTAWIENIA_KLUCZ, JSON.stringify(ustawienia)); }catch{ /* tryb prywatny */ }
 }
 
 function zapiszUstawienia(){
+  const p = ustawienia.provider;
+  ustawienia.klucze[p] = el.apikey.value.trim();
+  ustawienia.modele[p] = el.model.value.trim();
+  ustawienia.awaryjny = el.awaryjny.checked;
+  zapisz();
+}
+
+function zmienSilnik(){
   ustawienia.provider = $('input[name="provider"]:checked')?.value || 'gemini';
-  ustawienia.apiKey = el.apikey.value.trim();
-  ustawienia.model = el.model.value.trim();
-  el.model.placeholder = PROVIDERS[ustawienia.provider].model;
-  el.providerHelp.textContent = PROVIDERS[ustawienia.provider].skad;
-  try{ localStorage.setItem(USTAWIENIA_KLUCZ, JSON.stringify(ustawienia)); }catch{ /* tryb prywatny */ }
+  zapisz();
+  pokazPolaSilnika();
 }
 
 /* ---------------- baza okazów ---------------- */
@@ -199,11 +277,12 @@ const HINT = 'Wypełnij kadr liściem lub kwiatem';
 const KROKI = ['Przygotowuję okaz', 'Porównuję cechy', 'Oznaczam gatunek', 'Spisuję arkusz'];
 
 async function analizuj(dataUrl){
-  if(!ustawienia.apiKey){
+  if(!przezSerwerViridarium() && !wlasnyKlucz()){
     otworzNakladke(el.settings);
-    komunikat('Najpierw wklej klucz API.', true);
+    komunikat(`Najpierw wklej klucz dla silnika ${PROVIDERS[ustawienia.provider].nazwa}.`, true);
     return;
   }
+  ostatnieZdjecie = dataUrl;
 
   el.busyImg.src = dataUrl;
   el.busy.hidden = false;
@@ -221,13 +300,16 @@ async function analizuj(dataUrl){
   const naStatus = tekst => { clearInterval(tyka); el.busyStep.textContent = tekst; };
 
   try{
-    const dane = await recognize({
-      dataUrl,
-      provider: ustawienia.provider,
-      apiKey: ustawienia.apiKey,
-      model: ustawienia.model,
-      naStatus
-    });
+    const dane = przezSerwerViridarium()
+      ? await przezSerwer({ serwer: SERWER_URL, dataUrl, urzadzenie: idUrzadzenia() })
+      : await recognize({
+          dataUrl,
+          provider: ustawienia.provider,
+          klucze: ustawienia.klucze,
+          modele: ustawienia.modele,
+          awaryjny: ustawienia.awaryjny !== false,
+          naStatus
+        });
 
     const okaz = {
       dane,
@@ -236,22 +318,36 @@ async function analizuj(dataUrl){
       data: new Date().toISOString()
     };
     okaz.id = await dodajOkaz(okaz);
-    if(dane._model && dane._model !== ustawienia.model){
-      el.model.value = dane._model;
-      zapiszUstawienia();
+    if(typeof dane._pozostalo === 'number') pokazLimit(dane._pozostalo);
+
+    const silnik = dane._silnik || ustawienia.provider;
+    if(!przezSerwerViridarium() && dane._model && dane._model !== ustawienia.modele[silnik]){
+      ustawienia.modele[silnik] = dane._model;
+      zapisz();
+      if(silnik === ustawienia.provider) el.model.value = dane._model;
       komunikat(`Przełączono na model ${dane._model}.`);
     }
     ostatniOkaz = okaz;
     await odswiezLicznik();
     pokazArkusz(okaz);
   }catch(e){
-    komunikat(e.message, true);
+    if(typeof e.pozostalo === 'number') pokazLimit(e.pozostalo);
+    // limit i brak rośliny to nie awarie — ponawianie nic tu nie da
+    const bezPonowienia = ['limit', 'pula', 'brak-rosliny', 'limit-dostawcy', 'klucz'].includes(e.kod);
+    // zdjęcie zostaje w pamięci, więc ponowienie nie wymaga ustawiania kadru od nowa
+    komunikat(e.message, true, bezPonowienia ? null : { etykieta: 'Ponów', akcja: () => analizuj(ostatnieZdjecie) });
   }finally{
     clearInterval(tyka);
     el.busy.hidden = true;
     el.camera.classList.remove('is-scanning');
     el.analyze.disabled = false;
   }
+}
+
+function pokazLimit(pozostalo){
+  el.limitInfo.textContent = `Dziś zostało: ${pozostalo}.`;
+  if(pozostalo > 0 && pozostalo <= 3)
+    setTimeout(() => komunikat(`Zostały dziś ${pozostalo} analizy. Limit odnowi się jutro.`), 3200);
 }
 
 /* ---------------- arkusz wyniku ---------------- */
@@ -408,12 +504,21 @@ function otworzNakladke(node){ node.hidden = false; }
 function zamknijNakladki(){ el.herbarium.hidden = true; el.settings.hidden = true; }
 
 let toastTimer;
-function komunikat(tekst, blad = false){
+function komunikat(tekst, blad = false, akcja = null){
   el.toast.textContent = tekst;
   el.toast.classList.toggle('toast--err', blad);
+
+  if(akcja){
+    const b = document.createElement('button');
+    b.className = 'toast__akcja';
+    b.textContent = akcja.etykieta;
+    b.addEventListener('click', () => { el.toast.hidden = true; akcja.akcja(); });
+    el.toast.appendChild(b);
+  }
+
   el.toast.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.toast.hidden = true; }, blad ? 6000 : 3000);
+  toastTimer = setTimeout(() => { el.toast.hidden = true; }, akcja ? 12000 : blad ? 6000 : 3000);
 }
 
 /* ---------------- zdarzenia ---------------- */
@@ -489,25 +594,26 @@ document.addEventListener('keydown', e => {
   else zamknijNakladki();
 });
 
-$$('input[name="provider"]').forEach(i => i.addEventListener('change', zapiszUstawienia));
+$$('input[name="provider"]').forEach(i => i.addEventListener('change', zmienSilnik));
+el.awaryjny.addEventListener('change', zapiszUstawienia);
 el.apikey.addEventListener('input', zapiszUstawienia);
 el.model.addEventListener('input', zapiszUstawienia);
 
 el.modelsBtn.addEventListener('click', async () => {
-  if(!ustawienia.apiKey){ komunikat('Najpierw wklej klucz API.', true); return; }
-  if(ustawienia.provider !== 'gemini'){ komunikat('Sprawdzanie listy działa na razie tylko dla Gemini.', true); return; }
+  if(!ustawienia.klucze.gemini){ komunikat('Najpierw wklej klucz Gemini.', true); return; }
+  if(ustawienia.provider !== 'gemini'){ komunikat('Lista modeli działa na razie tylko dla Gemini.', true); return; }
 
   el.modelsBtn.disabled = true;
   el.modelsBtn.textContent = 'Sprawdzam…';
   try{
-    const nazwy = await listujModeleGemini(ustawienia.apiKey);
+    const nazwy = await listujModeleGemini(ustawienia.klucze.gemini);
     if(!nazwy.length){
       el.modelsOut.hidden = true;
       komunikat('Klucz działa, ale nie udostępnia żadnego modelu do analizy zdjęć.', true);
       return;
     }
     const polecany = wybierzModelGemini(nazwy);
-    const aktualny = ustawienia.model || PROVIDERS.gemini.model;
+    const aktualny = ustawienia.modele.gemini || PROVIDERS.gemini.model;
     el.modelsOut.innerHTML = `
       <p class="models__head">Dostępne dla twojego klucza (${nazwy.length}) — stuknij, żeby wybrać</p>
       <ul class="models__list">${nazwy.map(n => `
@@ -522,6 +628,23 @@ el.modelsBtn.addEventListener('click', async () => {
   }finally{
     el.modelsBtn.disabled = false;
     el.modelsBtn.textContent = 'Sprawdź modele';
+  }
+});
+
+el.testBtn.addEventListener('click', async () => {
+  const p = ustawienia.provider;
+  if(!ustawienia.klucze[p]){ komunikat(`Brak klucza dla silnika ${PROVIDERS[p].nazwa}.`, true); return; }
+
+  el.testBtn.disabled = true;
+  el.testBtn.textContent = 'Sprawdzam…';
+  try{
+    const wynik = await testPolaczenia({ provider: p, apiKey: ustawienia.klucze[p], model: ustawienia.modele[p] });
+    komunikat(`${PROVIDERS[p].nazwa} odpowiada. Model ${wynik.model} działa.`);
+  }catch(e){
+    komunikat(e.message, true);
+  }finally{
+    el.testBtn.disabled = false;
+    el.testBtn.textContent = 'Sprawdź połączenie';
   }
 });
 
