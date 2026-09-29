@@ -7,7 +7,7 @@
 const PROVIDERS = {
   gemini: {
     nazwa: 'Gemini',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
     skad: 'Klucz z Google AI Studio (aistudio.google.com) — darmowy limit wystarcza na testy.'
   },
   anthropic: {
@@ -187,58 +187,129 @@ async function przezAnthropic({ base64, mime, apiKey, model }){
 
 const PRZERWY = [1500, 4000, 9000];   // silnik pod obciążeniem zwykle wraca w kilka sekund
 
-async function recognize({ dataUrl, provider, apiKey, model, naStatus = () => {} }){
-  if(!apiKey) throw new Error('Brakuje klucza API. Otwórz ustawienia i wklej klucz.');
-  const { base64, mime } = rozbijDataUrl(dataUrl);
-  const uzytyModel = model || PROVIDERS[provider].model;
+/* Droga domyślna: przez serwer Viridarium. Klucz API zostaje na serwerze,
+   serwer sam ponawia, podmienia modele i przełącza silniki. */
+async function przezSerwer({ serwer, dataUrl, urzadzenie }){
+  let res;
+  try{
+    res = await fetch(`${serwer}/analiza`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ obraz: dataUrl, urzadzenie })
+    });
+  }catch{
+    throw new Error('Brak połączenia z serwerem. Sprawdź internet.');
+  }
 
-  const zapytaj = m => provider === 'anthropic'
+  let d = {};
+  try{ d = await res.json(); }catch{ /* pusta odpowiedź */ }
+
+  if(!res.ok){
+    const e = new Error(d.blad || `Serwer odpowiedział kodem ${res.status}.`);
+    e.kod = d.kod;
+    e.pozostalo = d.pozostalo;
+    throw e;
+  }
+  const wynik = d.wynik;
+  wynik._pozostalo = d.pozostalo;
+  return wynik;
+}
+
+/* Jedno podejście do jednego silnika: ponawianie przy przeciążeniu,
+   a dla Gemini także podmiana modelu, gdy nazwa przestała istnieć. */
+async function przezSilnik({ silnik, base64, mime, apiKey, model, naStatus }){
+  const uzytyModel = model || PROVIDERS[silnik].model;
+  const zapytaj = m => silnik === 'anthropic'
     ? przezAnthropic({ base64, mime, apiKey, model: m })
     : przezGemini({ base64, mime, apiKey, model: m });
 
-  let wynik;
-  try{
-    let ostatni;
-
-    // Podejście po podejściu tym samym modelem — przeciążenie zwykle mija samo.
-    for(let i = 0; i <= PRZERWY.length; i++){
-      try{ wynik = await zapytaj(uzytyModel); break; }
-      catch(e){
-        ostatni = e;
-        if(!e.przeciazony || i === PRZERWY.length) break;
-        naStatus(`Silnik zajęty — ponawiam (${i + 1}/${PRZERWY.length})`);
-        await spij(PRZERWY[i]);
-      }
+  let ostatni;
+  for(let i = 0; i <= PRZERWY.length; i++){
+    try{ return await zapytaj(uzytyModel); }
+    catch(e){
+      ostatni = e;
+      if(!e.przeciazony || i === PRZERWY.length) break;
+      naStatus(`${PROVIDERS[silnik].nazwa} zajęty — ponawiam (${i + 1}/${PRZERWY.length})`);
+      await spij(PRZERWY[i]);
     }
-
-    // Wciąż nic? Spróbuj innym modelem z tych, które udostępnia klucz.
-    if(!wynik && provider === 'gemini' && ostatni &&
-       (ostatni.przeciazony || /nie zna tego modelu/i.test(ostatni.message))){
-      const dostepne = await listujModeleGemini(apiKey).catch(() => []);
-      const kandydaci = dostepne.filter(n => n !== uzytyModel).slice(0, 3);
-      for(const kandydat of kandydaci){
-        naStatus(`Przechodzę na ${kandydat}`);
-        try{
-          wynik = await zapytaj(kandydat);
-          wynik._model = kandydat;
-          break;
-        }catch(e){ ostatni = e; }
-      }
-    }
-
-    if(!wynik){
-      if(ostatni?.przeciazony)
-        throw new Error('Silniki Google są teraz oblegane i odrzucają zapytania. Spróbuj za kilka minut — zdjęcie nie przepadnie, wystarczy nacisnąć Analizuj ponownie.');
-      throw ostatni || new Error('Nie udało się wykonać analizy.');
-    }
-  }catch(e){
-    if(e instanceof TypeError)
-      throw new Error('Brak połączenia z silnikiem. Sprawdź internet.');
-    throw e;
   }
 
-  if(wynik.rozpoznano === false)
-    throw new Error(wynik.powod || 'Na tym zdjęciu nie widać rośliny, którą da się oznaczyć.');
+  if(silnik === 'gemini' && (ostatni?.przeciazony || /nie zna tego modelu/i.test(ostatni?.message || ''))){
+    const dostepne = await listujModeleGemini(apiKey).catch(() => []);
+    for(const kandydat of dostepne.filter(n => n !== uzytyModel).slice(0, 3)){
+      naStatus(`Przechodzę na ${kandydat}`);
+      try{
+        const wynik = await zapytaj(kandydat);
+        wynik._model = kandydat;
+        return wynik;
+      }catch(e){ ostatni = e; }
+    }
+  }
+  throw ostatni || new Error('Nie udało się wykonać analizy.');
+}
 
-  return wynik;
+/* Sprawdza sam klucz, bez robienia zdjęcia. Kosztuje ułamek grosza. */
+async function testPolaczenia({ provider, apiKey, model }){
+  if(!apiKey) throw new Error('Brak klucza dla tego silnika.');
+  const uzytyModel = model || PROVIDERS[provider].model;
+
+  if(provider === 'gemini'){
+    const nazwy = await listujModeleGemini(apiKey);
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(uzytyModel)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'ok' }] }], generationConfig: { maxOutputTokens: 1 } })
+    });
+    if(!res.ok) await bladHTTP(res, 'Silnik odrzucił zapytanie próbne.');
+    return { modeli: nazwy.length, model: uzytyModel };
+  }
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({ model: uzytyModel, max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] })
+  });
+  if(!res.ok) await bladHTTP(res, 'Silnik odrzucił zapytanie próbne.');
+  return { model: uzytyModel };
+}
+
+/* Wejście: próbuje wybranego silnika, a gdy ten zawiedzie — drugiego,
+   o ile ma wpisany własny klucz. */
+async function recognize({ dataUrl, provider, klucze = {}, modele = {}, awaryjny = true, naStatus = () => {} }){
+  if(!klucze[provider])
+    throw new Error(`Brakuje klucza dla silnika ${PROVIDERS[provider].nazwa}. Otwórz ustawienia i wklej go.`);
+
+  const { base64, mime } = rozbijDataUrl(dataUrl);
+  const drugi = provider === 'gemini' ? 'anthropic' : 'gemini';
+  const kolejka = [provider];
+  if(awaryjny && klucze[drugi]) kolejka.push(drugi);
+
+  let ostatni;
+  for(const silnik of kolejka){
+    if(silnik !== provider) naStatus(`Przechodzę na ${PROVIDERS[silnik].nazwa}`);
+    try{
+      const wynik = await przezSilnik({
+        silnik, base64, mime,
+        apiKey: klucze[silnik], model: modele[silnik], naStatus
+      });
+      wynik._silnik = silnik;
+      if(wynik.rozpoznano === false)
+        throw new Error(wynik.powod || 'Na tym zdjęciu nie widać rośliny, którą da się oznaczyć.');
+      return wynik;
+    }catch(e){
+      if(e instanceof TypeError) ostatni = new Error('Brak połączenia z siecią.');
+      else ostatni = e;
+      // brak rośliny na zdjęciu to odpowiedź, nie awaria — drugi silnik nic tu nie poprawi
+      if(/nie widać rośliny|nie przedstawia/i.test(ostatni.message)) throw ostatni;
+    }
+  }
+
+  if(ostatni?.przeciazony && kolejka.length === 1)
+    throw new Error('Silnik jest oblegany i odrzuca zapytania. Wpisz w ustawieniach drugi klucz, a aplikacja sama się przełączy.');
+  throw ostatni || new Error('Nie udało się wykonać analizy.');
 }

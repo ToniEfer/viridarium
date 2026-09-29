@@ -2,7 +2,7 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
-const WERSJA = '1.8.1';   // musi zgadzać się z WERSJA w sw.js
+const WERSJA = '1.8.2';   // musi zgadzać się z WERSJA w sw.js
 
 /* Adres serwera pośredniczącego. Pusty = aplikacja wymaga własnego klucza API. */
 const SERWER_URL = 'https://viridarium.toniefer.workers.dev';
