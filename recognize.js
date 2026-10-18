@@ -137,19 +137,31 @@ function wybierzModelGemini(nazwy){
 
 /* ---------- Gemini ---------- */
 
-async function przezGemini({ base64, mime, apiKey, model }){
+/* Średnia rozdzielczość zdjęcia i płytkie myślenie: ok. 30% taniej, a myśli
+   (płatne jak odpowiedź) nie wypychają arkusza poza limit długości. */
+const GEMINI_OSZCZEDNY = {
+  responseMimeType: 'application/json',
+  maxOutputTokens: 4096,
+  mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
+  thinkingConfig: { thinkingLevel: 'LOW' }
+};
+const GEMINI_PROSTY = { responseMimeType: 'application/json', maxOutputTokens: 4096 };
+
+async function przezGemini({ base64, mime, apiKey, model, oszczednie = true }){
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       contents: [{ parts: [ { text: PROMPT }, { inline_data: { mime_type: mime, data: base64 } } ] }],
-      generationConfig: { temperature: 0.2, responseMimeType: 'application/json', maxOutputTokens: 2400 }
+      generationConfig: oszczednie ? GEMINI_OSZCZEDNY : GEMINI_PROSTY
     })
   });
+  // starszy model może nie znać ustawień myślenia — wtedy pytamy go po staremu
+  if(res.status === 400 && oszczednie) return przezGemini({ base64, mime, apiKey, model, oszczednie: false });
   if(!res.ok) await bladHTTP(res, 'Gemini odrzucił zapytanie.');
   const data = await res.json();
-  const tekst = data?.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+  const tekst = data?.candidates?.[0]?.content?.parts?.filter(p => !p.thought).map(p => p.text).filter(Boolean).join('') || '';
   return wyciagnijJSON(tekst);
 }
 
