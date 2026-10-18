@@ -4,7 +4,53 @@ PWA: kamera → przycisk „Analizuj" → arkusz zielnikowy z oznaczeniem gatunk
 opisem siedliska, zasadami uprawy i oceną kondycji. Każde rozpoznanie dopisuje
 okaz do lokalnego zielnika.
 
-## 1. Klucz API
+## 0. Serwer pośredniczący — dla innych użytkowników
+
+Od wersji 1.8.0 aplikacja może działać **bez żadnego klucza po stronie
+użytkownika**. Zdjęcie idzie do twojego serwera (Cloudflare Worker, kod w
+`serwer/worker.js`), który trzyma klucz u siebie, pilnuje dziennych limitów
+i sam przełącza silniki, gdy któryś zawiedzie.
+
+Dopóki w `app.js` stała `SERWER_URL` jest pusta, aplikacja działa jak dawniej
+i wymaga własnego klucza.
+
+### Uruchomienie serwera (panel Cloudflare, bez terminala)
+
+1. Załóż darmowe konto na dash.cloudflare.com.
+2. **Workers & Pages → Create application → Start with Hello World! →
+   Get started**. Nazwa: `viridarium`. **Deploy**.
+3. **Edit code** — usuń wszystko, wklej zawartość `serwer/worker.js`, **Deploy**.
+4. **Workers KV → Create instance**, nazwa `viridarium-limity`, **Create**.
+5. Wróć do Workera → zakładka **Bindings → Add binding → KV namespace**.
+   Variable name: `LIMITY`, wybierz `viridarium-limity`, **Add binding**.
+6. **Settings → Variables and Secrets → Add**. Type: **Secret**,
+   name: `GEMINI_KEY`, value: twój klucz z AI Studio. **Deploy**.
+   Opcjonalnie drugi sekret `ANTHROPIC_KEY` — serwer użyje go, gdy Gemini padnie.
+7. Adres Workera ma postać `https://viridarium.<twoje-konto>.workers.dev`.
+   Wejdź na niego z dopiskiem `/status` — powinieneś zobaczyć
+   `{"ok":true,...,"gemini":true,...,"limity":true}`.
+8. Wpisz ten adres w `app.js` jako `SERWER_URL`, podbij wersję, wgraj.
+
+### Limity
+
+Domyślnie 20 analiz dziennie na urządzenie, 40 na adres IP, 300 łącznie
+dla wszystkich. Zmienisz je, dodając w **Variables and Secrets** zwykłe
+zmienne (nie sekrety) `LIMIT_URZADZENIE`, `LIMIT_IP`, `LIMIT_DZIENNY`.
+Limity liczą się w czasie UTC, więc odnawiają się o 2:00 czasu polskiego.
+Nieudane analizy nie zużywają limitu.
+
+Darmowy plan Workers KV pozwala na około 1000 zapisów dziennie, a każda
+analiza to trzy zapisy — przy więcej niż ~300 analizach dziennie potrzebny
+będzie plan płatny (5 USD miesięcznie).
+
+### Czego serwer nie przepuści
+
+Przyjmuje wyłącznie zdjęcia (JPEG, PNG, WebP, do ok. 1,8 MB) i tylko z adresu
+aplikacji. Polecenie dla modelu jest zaszyte w serwerze, więc nikt nie użyje
+go jako darmowego dostępu do AI. Jeśli zmieniasz treść promptu w
+`recognize.js`, zmień ją też w `serwer/worker.js`.
+
+## 1. Klucz API (tryb bez serwera)
 
 Aplikacja nie ma własnego serwera — pyta wybrany silnik prosto z przeglądarki.
 
@@ -74,14 +120,17 @@ wtedy podmienić adres i usunąć nagłówki z kluczem.
 
 ## 6. Aktualizacja po zmianach
 
-Podbij numer wersji w **dwóch** plikach — muszą być identyczne:
+Podbij numer wersji w **trzech** miejscach — muszą być identyczne:
 
-```js
-// sw.js
-const WERSJA = '1.6.0';   // → '1.6.1'
-// app.js
-const WERSJA = '1.6.0';   // → '1.6.1'
 ```
+sw.js        const WERSJA = '1.8.5';
+app.js       const WERSJA = '1.8.5';
+index.html   app.css?v=1.8.5   recognize.js?v=1.8.5   app.js?v=1.8.5
+```
+
+Dopiski `?v=` w `index.html` gwarantują, że strona zawsze dostanie styl
+i kod z tego samego wydania co ona sama — bez nich telefon potrafił
+połączyć nowy HTML ze starym CSS i JS.
 
 To wszystko. Zainstalowana aplikacja sama zauważy zmianę: przy uruchomieniu
 i przy powrocie z tła sprawdza, czy na serwerze jest coś nowego (nie częściej

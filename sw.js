@@ -1,11 +1,14 @@
 /* Service worker: powłoka aplikacji offline.
-   WERSJA musi być zgodna z tą w app.js — jej zmiana uruchamia aktualizację
-   u wszystkich, którzy mają aplikację zainstalowaną. */
-const WERSJA = '1.8.4';
+   WERSJA musi być zgodna z app.js i z dopiskami ?v= w index.html.
+   Pliki mają wersję w adresie, więc strona nigdy nie dostanie
+   stylu ani kodu z innego wydania niż ona sama. */
+const WERSJA = '1.8.5';
 const CACHE = `viridarium-${WERSJA}`;
+const V = `?v=${WERSJA}`;
 
 const POWLOKA = [
-  './', './index.html', './app.css', './app.js', './recognize.js',
+  './', './index.html',
+  `./app.css${V}`, `./app.js${V}`, `./recognize.js${V}`,
   './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'
 ];
 
@@ -29,18 +32,30 @@ self.addEventListener('message', e => {
 });
 
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
   if(e.request.method !== 'GET') return;
-  if(url.origin !== location.origin && !url.hostname.endsWith('gstatic.com') && !url.hostname.endsWith('googleapis.com')) return;
-  if(url.hostname === 'generativelanguage.googleapis.com') return;
+  const url = new URL(e.request.url);
 
+  // Strona: najpierw sieć — świeży HTML wskazuje pliki we właściwej wersji.
+  // Bez sieci: strona z pamięci, razem z plikami z tego samego wydania.
+  if(e.request.mode === 'navigate'){
+    e.respondWith(
+      fetch(e.request).catch(() => caches.open(CACHE).then(c => c.match('./index.html')))
+    );
+    return;
+  }
+
+  const czcionki = url.hostname.endsWith('gstatic.com') || url.hostname === 'fonts.googleapis.com';
+  if(url.origin !== location.origin && !czcionki) return;   // serwer analiz i Google AI zawsze z sieci
+
+  // Pozostałe pliki: tylko z pamięci TEGO wydania, inaczej z sieci.
   e.respondWith(
-    caches.match(e.request).then(trafienie =>
-      trafienie || fetch(e.request).then(res => {
-        const kopia = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, kopia)).catch(() => {});
-        return res;
-      }).catch(() => trafienie)
+    caches.open(CACHE).then(c =>
+      c.match(e.request).then(trafienie =>
+        trafienie || fetch(e.request).then(res => {
+          if(res.ok) c.put(e.request, res.clone()).catch(() => {});
+          return res;
+        })
+      )
     )
   );
 });
