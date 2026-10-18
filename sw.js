@@ -1,7 +1,7 @@
 /* Service worker: powłoka aplikacji offline.
    WERSJA musi być zgodna z tą w app.js — jej zmiana uruchamia aktualizację
    u wszystkich, którzy mają aplikację zainstalowaną. */
-const WERSJA = '1.8.3';
+const WERSJA = '1.8.4';
 const CACHE = `viridarium-${WERSJA}`;
 
 const POWLOKA = [

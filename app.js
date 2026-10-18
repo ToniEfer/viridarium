@@ -2,7 +2,7 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
-const WERSJA = '1.8.3';   // musi zgadzać się z WERSJA w sw.js
+const WERSJA = '1.8.4';   // musi zgadzać się z WERSJA w sw.js
 
 /* Adres serwera pośredniczącego. Pusty = aplikacja wymaga własnego klucza API. */
 const SERWER_URL = 'https://viridarium.toniefer.workers.dev';
@@ -559,6 +559,7 @@ el.video.addEventListener('click', wznow);
 $('#btn-herbarium').addEventListener('click', pokazZielnik);
 el.introHerb.addEventListener('click', pokazZielnik);   // zielnik bez uruchamiania aparatu
 $('#btn-settings').addEventListener('click', () => otworzNakladke(el.settings));
+$('#btn-intro-settings').addEventListener('click', () => otworzNakladke(el.settings));   // ustawienia bez włączania aparatu
 
 document.addEventListener('click', async e => {
   if(e.target.closest('[data-close-sheet]')) zamknijArkusz();

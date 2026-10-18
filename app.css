@@ -77,6 +77,11 @@ button{ font:inherit; color:inherit; }
   text-wrap:balance;
 }
 .intro__herb{ margin-top:14px; }
+.icon-btn.intro__settings{
+  position:absolute; top:calc(12px + var(--safe-t)); right:12px;
+  color:var(--on-ink-dim);
+}
+.icon-btn.intro__settings:hover{ color:var(--on-ink); }
 .intro__herb-count{ color:var(--pollen); }
 
 .intro__ver{
@@ -448,6 +453,33 @@ button{ font:inherit; color:inherit; }
   font-family:var(--mono); font-size:13.5px;
 }
 .input:focus{ border-color:var(--verd); outline:none; }
+.tryb{ margin:0; font-size:14.5px; line-height:1.55; color:var(--on-ink); }
+.tryb span{ color:var(--on-ink-dim); }
+.zaaw{ margin:0 0 30px; border-top:1px solid var(--ink-3); border-bottom:1px solid var(--ink-3); }
+.zaaw[open]{ padding-bottom:4px; }
+.zaaw__sum{
+  cursor:pointer; list-style:none; padding:16px 0;
+  font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--on-ink-dim); display:flex; justify-content:space-between; align-items:center;
+}
+.zaaw__sum::-webkit-details-marker{ display:none; }
+.zaaw__sum::after{ content:'+'; font-size:16px; color:var(--verd); }
+.zaaw[open] .zaaw__sum::after{ content:'−'; }
+.zaaw__opis{ margin:0 0 22px; }
+.zaaw--wymagane .zaaw__sum{ cursor:default; pointer-events:none; }
+.zaaw--wymagane .zaaw__sum::after{ content:''; }
+
+.label__dla{ color:var(--verd); letter-spacing:.14em; }
+.field--rzad{ display:flex; gap:10px; flex-wrap:wrap; }
+.check{ display:flex; align-items:center; gap:11px; margin:0 0 26px; cursor:pointer; }
+.check input{ width:18px; height:18px; accent-color:var(--verd); flex:none; }
+.check span{ font-size:13.5px; color:var(--on-ink-dim); line-height:1.4; }
+.toast__akcja{
+  appearance:none; border:none; cursor:pointer; margin-left:14px;
+  background:var(--type); color:var(--sheet); padding:7px 13px; border-radius:2px;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+}
+
 .help{ display:block; margin-top:8px; font-size:12.5px; line-height:1.55; color:var(--on-ink-dim); }
 .segmented{ display:flex; gap:0; border:1px solid var(--ink-3); border-radius:2px; overflow:hidden; width:max-content; }
 .segmented label{ cursor:pointer; }

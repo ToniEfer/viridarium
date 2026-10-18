@@ -21,6 +21,9 @@
 
 <!-- ============ EKRAN STARTOWY ============ -->
 <section id="intro" class="screen screen--intro">
+  <button id="btn-intro-settings" class="icon-btn intro__settings" aria-label="Ustawienia">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2 5.6 5.6"/></svg>
+  </button>
   <div class="intro__mark" aria-hidden="true">
     <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.25">
       <path d="M32 58V26"/>
@@ -107,6 +110,15 @@
   </header>
 
   <div class="form">
+    <div class="field" id="tryb-serwer" hidden>
+      <span class="label">Analiza</span>
+      <p class="tryb">Działa bez żadnej konfiguracji. <span id="limit-info"></span></p>
+    </div>
+
+    <details class="zaaw" id="zaawansowane">
+    <summary class="zaaw__sum" id="zaaw-sum">Własny klucz API · opcjonalnie</summary>
+    <p class="help zaaw__opis" id="zaaw-opis">Przydaje się, gdy wyczerpiesz dzienny limit albo chcesz korzystać z innego silnika. Z własnym kluczem aplikacja łączy się prosto z Google lub Anthropic, z pominięciem serwera Viridarium.</p>
+
     <fieldset class="field">
       <legend class="label">Silnik rozpoznawania</legend>
       <div class="segmented">
@@ -117,9 +129,14 @@
     </fieldset>
 
     <label class="field">
-      <span class="label">Klucz API</span>
+      <span class="label">Klucz API <span id="klucz-dla" class="label__dla"></span></span>
       <input type="password" id="apikey" class="input" autocomplete="off" spellcheck="false" placeholder="wklej klucz">
-      <span class="help">Zapisywany tylko w pamięci tej przeglądarki. Nie wysyłamy go nigdzie poza wybrany silnik.</span>
+      <span class="help">Każdy silnik ma własny klucz — przełączenie silnika nie miesza ich ze sobą. Zapisywany tylko w pamięci tej przeglądarki.</span>
+    </label>
+
+    <label class="check">
+      <input type="checkbox" id="awaryjny">
+      <span>Przełączaj na drugi silnik, gdy pierwszy zawiedzie</span>
     </label>
 
     <label class="field">
@@ -128,10 +145,12 @@
       <span class="help">Zostaw puste, żeby użyć domyślnego. Nie wiesz którego? Sprawdź, co udostępnia twój klucz.</span>
     </label>
 
-    <div class="field">
+    <div class="field field--rzad">
+      <button id="btn-test" class="btn btn--line">Sprawdź połączenie</button>
       <button id="btn-models" class="btn btn--line">Sprawdź modele</button>
-      <div id="models-out" class="models" hidden></div>
     </div>
+    <div id="models-out" class="models" hidden></div>
+    </details>
 
     <div class="field">
       <span class="label">Zielnik</span>
