@@ -2,7 +2,7 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
-const WERSJA = '1.8.5';   // musi zgadzać się z WERSJA w sw.js i z ?v= w index.html
+const WERSJA = '1.8.6';   // musi zgadzać się z WERSJA w sw.js i z ?v= w index.html
 
 /* Adres serwera pośredniczącego. Pusty = aplikacja wymaga własnego klucza API. */
 const SERWER_URL = 'https://viridarium.toniefer.workers.dev';
@@ -649,12 +649,98 @@ el.testBtn.addEventListener('click', async () => {
   }
 });
 
-$('#btn-clear').addEventListener('click', async () => {
+/* Usuwanie wymaga drugiego dotknięcia — zielnik nie znika przez przypadek. */
+let potwierdzUsun = null;
+$('#btn-clear').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  if(!potwierdzUsun){
+    b.textContent = 'Na pewno? Dotknij ponownie';
+    potwierdzUsun = setTimeout(() => { potwierdzUsun = null; b.textContent = 'Usuń wszystkie okazy'; }, 4000);
+    return;
+  }
+  clearTimeout(potwierdzUsun); potwierdzUsun = null;
+  b.textContent = 'Usuń wszystkie okazy';
   await wyczyscOkazy();
   await odswiezLicznik();
   el.herbGrid.innerHTML = '';
   el.herbEmpty.hidden = false;
   komunikat('Zielnik wyczyszczony.');
+});
+
+/* ---------------- kopia zielnika (przenoszenie na inny telefon) ---------------- */
+
+const KOPIA_FORMAT = 'viridarium-zielnik';
+
+async function plikKopii(){
+  const okazy = (await wszystkieOkazy()).map(({ id, ...reszta }) => ({ nr: id, ...reszta }));
+  const kopia = { format: KOPIA_FORMAT, wersja_formatu: 1, aplikacja: WERSJA,
+                  utworzono: new Date().toISOString(), liczba: okazy.length, okazy };
+  const dzien = new Date().toISOString().slice(0, 10);
+  const nazwa = `viridarium-zielnik-${dzien}.json`;
+  return { plik: new File([JSON.stringify(kopia)], nazwa, { type: 'application/json' }), liczba: okazy.length };
+}
+
+async function zapiszKopie(){
+  const { plik, liczba } = await plikKopii();
+  if(!liczba){ komunikat('Zielnik jest pusty — nie ma czego zapisać.', true); return; }
+  const url = URL.createObjectURL(plik);
+  const a = Object.assign(document.createElement('a'), { href: url, download: plik.name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  komunikat(`Zapisano ${liczba} ${odmianaOkazow(liczba)} — plik ${plik.name} jest w Pobranych.`);
+}
+
+async function wyslijKopie(){
+  const { plik, liczba } = await plikKopii();
+  if(!liczba){ komunikat('Zielnik jest pusty — nie ma czego wysłać.', true); return; }
+  try{
+    await navigator.share({ files: [plik], title: 'Zielnik Viridarium' });
+  }catch(e){
+    if(e.name !== 'AbortError') { komunikat('Nie udało się udostępnić — użyj „Zapisz kopię”.', true); }
+  }
+}
+
+/* Klucz rozpoznający ten sam okaz: data zapisu + nazwa łacińska + długość zdjęcia. */
+const kluczOkazu = o => `${o.data}|${o.dane?.nazwa_lat || ''}|${(o.zdjecie || '').length}`;
+
+async function wczytajKopie(plik){
+  let kopia;
+  try{ kopia = JSON.parse(await plik.text()); }
+  catch{ komunikat('To nie jest plik kopii Viridarium.', true); return; }
+  const lista = Array.isArray(kopia) ? kopia : kopia?.okazy;
+  if(!Array.isArray(lista) || (kopia.format && kopia.format !== KOPIA_FORMAT)){
+    komunikat('To nie jest plik kopii Viridarium.', true); return;
+  }
+  const obecne = new Set((await wszystkieOkazy()).map(kluczOkazu));
+  // w kolejności oryginalnych numerów, żeby zielnik zachował porządek
+  const nowe = lista
+    .filter(o => o && o.dane && (o.zdjecie || o.mini))
+    .sort((a, b) => (a.nr ?? 0) - (b.nr ?? 0))
+    .filter(o => !obecne.has(kluczOkazu(o)));
+  for(const { nr, id, ...okaz } of nowe){
+    await dodajOkaz(okaz);
+    obecne.add(kluczOkazu(okaz));
+  }
+  await odswiezLicznik();
+  const pominiete = lista.length - nowe.length;
+  komunikat(nowe.length
+    ? `Wczytano ${nowe.length} ${odmianaOkazow(nowe.length)}${pominiete ? ` (pominięto ${pominiete} — już były)` : ''}.`
+    : 'Wszystkie okazy z tej kopii już są w zielniku.',
+    false, nowe.length ? { etykieta: 'Pokaż', akcja: () => { el.settings.hidden = true; pokazZielnik(); } } : null);
+}
+
+const btnShare = $('#btn-share');
+try{
+  btnShare.hidden = !(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'test.json', { type: 'application/json' })] }));
+}catch{ btnShare.hidden = true; }
+
+$('#btn-export').addEventListener('click', () => zapiszKopie().catch(e => komunikat(e.message, true)));
+btnShare.addEventListener('click', () => wyslijKopie());
+$('#btn-import').addEventListener('click', () => $('#import-input').click());
+$('#import-input').addEventListener('change', async e => {
+  const plik = e.target.files?.[0];
+  e.target.value = '';
+  if(plik) await wczytajKopie(plik).catch(err => komunikat(err.message, true));
 });
 
 /* ---------------- start ---------------- */

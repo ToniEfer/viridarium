@@ -177,3 +177,10 @@ w oznaczeniu rośliny jadalnej bywa groźna, a modele mylą gatunki podobne.
   czymś więcej niż oceną z jednego zdjęcia.
 - Zapis miejsca i daty zbioru przy okazie (geolokalizacja), eksport zielnika,
   filtrowanie po rodzinie.
+
+## Przenoszenie zielnika na inny telefon (od 1.8.6)
+
+Zielnik jest zapisany w pamięci przeglądarki telefonu — nie przenosi się sam.
+1. Stary telefon: Ustawienia → Zielnik → **Zapisz kopię** (plik `viridarium-zielnik-RRRR-MM-DD.json` trafia do Pobranych) albo **Wyślij kopię…** (Dysk, Gmail, Quick Share).
+2. Nowy telefon: otwórz aplikację → Ustawienia → **Wczytaj kopię** → wskaż plik.
+Okazy, które już są w zielniku, są pomijane — kopię można wczytać ponownie bez dubli.

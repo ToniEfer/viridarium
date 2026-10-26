@@ -2,7 +2,7 @@
    WERSJA musi być zgodna z app.js i z dopiskami ?v= w index.html.
    Pliki mają wersję w adresie, więc strona nigdy nie dostanie
    stylu ani kodu z innego wydania niż ona sama. */
-const WERSJA = '1.8.5';
+const WERSJA = '1.8.6';
 const CACHE = `viridarium-${WERSJA}`;
 const V = `?v=${WERSJA}`;
 

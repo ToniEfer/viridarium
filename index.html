@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=Karla:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=1.8.5">
+<link rel="stylesheet" href="app.css?v=1.8.6">
 </head>
 <body>
 
@@ -154,6 +154,13 @@
 
     <div class="field">
       <span class="label">Zielnik</span>
+      <p class="help" id="kopia-info">Kopia zapasowa — przeniesiesz nią zielnik na inny telefon.</p>
+      <div class="field--rzad kopia">
+        <button id="btn-export" class="btn btn--line">Zapisz kopię</button>
+        <button id="btn-share" class="btn btn--line" hidden>Wyślij kopię…</button>
+        <button id="btn-import" class="btn btn--line">Wczytaj kopię</button>
+      </div>
+      <input type="file" id="import-input" accept=".json,application/json" hidden>
       <button id="btn-clear" class="btn btn--danger">Usuń wszystkie okazy</button>
     </div>
 
@@ -186,7 +193,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="recognize.js?v=1.8.5"></script>
-<script src="app.js?v=1.8.5"></script>
+<script src="recognize.js?v=1.8.6"></script>
+<script src="app.js?v=1.8.6"></script>
 </body>
 </html>

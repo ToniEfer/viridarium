@@ -471,6 +471,8 @@ button{ font:inherit; color:inherit; }
 
 .label__dla{ color:var(--verd); letter-spacing:.14em; }
 .field--rzad{ display:flex; gap:10px; flex-wrap:wrap; }
+.kopia{ margin:10px 0 16px; }
+#kopia-info{ margin:0; }
 .check{ display:flex; align-items:center; gap:11px; margin:0 0 26px; cursor:pointer; }
 .check input{ width:18px; height:18px; accent-color:var(--verd); flex:none; }
 .check span{ font-size:13.5px; color:var(--on-ink-dim); line-height:1.4; }
