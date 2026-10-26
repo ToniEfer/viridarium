@@ -2,7 +2,7 @@
    app.js — aparat, zielnik, arkusz wyniku
    ============================================================ */
 
-const WERSJA = '1.8.6';   // musi zgadzać się z WERSJA w sw.js i z ?v= w index.html
+const WERSJA = '1.8.7';   // musi zgadzać się z WERSJA w sw.js i z ?v= w index.html
 
 /* Adres serwera pośredniczącego. Pusty = aplikacja wymaga własnego klucza API. */
 const SERWER_URL = 'https://viridarium.toniefer.workers.dev';
@@ -500,7 +500,10 @@ async function pokazZielnik(){
 
 /* ---------------- nakładki i komunikaty ---------------- */
 
-function otworzNakladke(node){ node.hidden = false; }
+function otworzNakladke(node){
+  node.hidden = false;
+  if(node === el.settings && typeof przygotujKopie === 'function') przygotujKopie();
+}
 function zamknijNakladki(){ el.herbarium.hidden = true; el.settings.hidden = true; }
 
 let toastTimer;
@@ -664,6 +667,7 @@ $('#btn-clear').addEventListener('click', async e => {
   await odswiezLicznik();
   el.herbGrid.innerHTML = '';
   el.herbEmpty.hidden = false;
+  przygotujKopie();
   komunikat('Zielnik wyczyszczony.');
 });
 
@@ -671,13 +675,16 @@ $('#btn-clear').addEventListener('click', async e => {
 
 const KOPIA_FORMAT = 'viridarium-zielnik';
 
-async function plikKopii(){
+async function plikKopii({ doWyslania = false } = {}){
   const okazy = (await wszystkieOkazy()).map(({ id, ...reszta }) => ({ nr: id, ...reszta }));
   const kopia = { format: KOPIA_FORMAT, wersja_formatu: 1, aplikacja: WERSJA,
                   utworzono: new Date().toISOString(), liczba: okazy.length, okazy };
   const dzien = new Date().toISOString().slice(0, 10);
-  const nazwa = `viridarium-zielnik-${dzien}.json`;
-  return { plik: new File([JSON.stringify(kopia)], nazwa, { type: 'application/json' }), liczba: okazy.length };
+  // Chrome na Androidzie nie udostępnia plików .json — do wysyłki idzie ta sama treść jako .txt
+  const rozsz = doWyslania ? 'txt' : 'json';
+  const typ = doWyslania ? 'text/plain' : 'application/json';
+  const nazwa = `viridarium-zielnik-${dzien}.${rozsz}`;
+  return { plik: new File([JSON.stringify(kopia)], nazwa, { type: typ }), liczba: okazy.length };
 }
 
 async function zapiszKopie(){
@@ -690,14 +697,28 @@ async function zapiszKopie(){
   komunikat(`Zapisano ${liczba} ${odmianaOkazow(liczba)} — plik ${plik.name} jest w Pobranych.`);
 }
 
-async function wyslijKopie(){
-  const { plik, liczba } = await plikKopii();
-  if(!liczba){ komunikat('Zielnik jest pusty — nie ma czego wysłać.', true); return; }
-  try{
-    await navigator.share({ files: [plik], title: 'Zielnik Viridarium' });
-  }catch(e){
-    if(e.name !== 'AbortError') { komunikat('Nie udało się udostępnić — użyj „Zapisz kopię”.', true); }
+/* Okno udostępniania musi się otworzyć od razu po dotknięciu, więc kopię
+   składamy zawczasu — przy otwarciu ustawień i po każdej zmianie zielnika. */
+let kopiaDoWyslania = null;
+function przygotujKopie(){
+  kopiaDoWyslania = null;
+  return plikKopii({ doWyslania: true }).then(k => (kopiaDoWyslania = k)).catch(() => null);
+}
+
+function wyslijKopie(){
+  const k = kopiaDoWyslania;
+  if(!k){
+    komunikat('Przygotowuję kopię… dotknij ponownie za chwilę.');
+    przygotujKopie();
+    return;
   }
+  if(!k.liczba){ komunikat('Zielnik jest pusty — nie ma czego wysłać.', true); return; }
+  if(navigator.canShare && !navigator.canShare({ files: [k.plik] })){
+    komunikat('Ten telefon nie pozwala wysłać takiego pliku — użyj „Zapisz kopię”.', true); return;
+  }
+  navigator.share({ files: [k.plik], title: 'Zielnik Viridarium' }).catch(e => {
+    if(e.name !== 'AbortError') komunikat(`Nie udało się udostępnić (${e.name}) — użyj „Zapisz kopię”.`, true);
+  });
 }
 
 /* Klucz rozpoznający ten sam okaz: data zapisu + nazwa łacińska + długość zdjęcia. */
@@ -722,6 +743,7 @@ async function wczytajKopie(plik){
     obecne.add(kluczOkazu(okaz));
   }
   await odswiezLicznik();
+  przygotujKopie();
   const pominiete = lista.length - nowe.length;
   komunikat(nowe.length
     ? `Wczytano ${nowe.length} ${odmianaOkazow(nowe.length)}${pominiete ? ` (pominięto ${pominiete} — już były)` : ''}.`
@@ -731,7 +753,7 @@ async function wczytajKopie(plik){
 
 const btnShare = $('#btn-share');
 try{
-  btnShare.hidden = !(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'test.json', { type: 'application/json' })] }));
+  btnShare.hidden = !(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'test.txt', { type: 'text/plain' })] }));
 }catch{ btnShare.hidden = true; }
 
 $('#btn-export').addEventListener('click', () => zapiszKopie().catch(e => komunikat(e.message, true)));

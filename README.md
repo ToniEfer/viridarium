@@ -181,6 +181,6 @@ w oznaczeniu rośliny jadalnej bywa groźna, a modele mylą gatunki podobne.
 ## Przenoszenie zielnika na inny telefon (od 1.8.6)
 
 Zielnik jest zapisany w pamięci przeglądarki telefonu — nie przenosi się sam.
-1. Stary telefon: Ustawienia → Zielnik → **Zapisz kopię** (plik `viridarium-zielnik-RRRR-MM-DD.json` trafia do Pobranych) albo **Wyślij kopię…** (Dysk, Gmail, Quick Share).
+1. Stary telefon: Ustawienia → Zielnik → **Zapisz kopię** (plik `viridarium-zielnik-RRRR-MM-DD.json` trafia do Pobranych) albo **Wyślij kopię…** (Dysk, Gmail, Quick Share — wysyłany plik ma końcówkę .txt, bo Chrome na Androidzie nie udostępnia plików .json; obie wersje wczytują się tak samo).
 2. Nowy telefon: otwórz aplikację → Ustawienia → **Wczytaj kopię** → wskaż plik.
 Okazy, które już są w zielniku, są pomijane — kopię można wczytać ponownie bez dubli.
